@@ -9,4 +9,4 @@ Branch ↓
 
 Arithmetic Contain
 ------------------
-* LoopRecBuff: A light method which receive the data with the loop-buff,like FIFO.
+* LoopRecBuff: A light method which receives the data with the loop-buff, and reading the loop-buff like FIFO.
