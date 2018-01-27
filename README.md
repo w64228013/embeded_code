@@ -1,2 +1,3 @@
 # embeded_code
-storage embeded code 
+u can see some detail codes in the other branchs
+================================================
