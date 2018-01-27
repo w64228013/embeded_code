@@ -11,12 +11,23 @@ Pos倒序:表示RecPos<ReadPos
 
 模式区别:主要是完成读取后ReadPos的位置选择。
 
-精确模式:ReadPos 按照 AimLength 长度偏移,常用于数据帧分段接收。
-粗略模式:ReadPos 按照 RecPos 的位置偏移。此模式可能需要再修改,使得功能更加明确。
+PreciseMode:ReadPos 按照 AimLength 长度偏移,常用于数据帧分段接收。
+RoughMode:ReadPos 按照 RecPos 的位置偏移。此模式可能需要再修改,使得功能更加明确。
 
 错误处理:
 1,新增数据长度 小于 AimLength,每次Pop_Buff(),内部usRetryCount倒计数,返回NULL,
 当usRetryCount计数结束,同步ReadPos和RecPos。
+
+****2018.1.26 V0.02****
+新增: enum BuffConsType;
+
+修改:
+	 Check_RetryCount_IsOver(),添加BuffConsType IsCheckAddtionalLength形参,内部相应改动，对额外长度也做检测
+	 Pop_Buff(),添加BuffConsType IsCheckAddtionalLength形参,内部相应改动,调用时可以选择是否检测额外长度
+
+	 函数名改变:functions' names have changed
+	 Pop_Buff() 改为-> Takeout_Buff()
+	 Push_Buff() 改为-> Putin_Buff()
 
 */ 
 
@@ -29,13 +40,13 @@ Pos倒序:表示RecPos<ReadPos
 
 #define PreciseMode  							0
 #define RoughMode		 						1
-#define BuffMode  	 							RoughMode	 
+#define BuffMode  	 							PreciseMode	 
 
 
 /************************************************************************************/
 typedef struct 
 {
-	unsigned char  ucBuff[MaxBuffLength];
+	unsigned char   ucBuff[MaxBuffLength];
 	unsigned short  usBuffLength;						/*缓存长度 没用到*/
 	unsigned short  usRecPos;							/*接收位置*/
 	unsigned short  usReadPos;							/*读取位置*/
@@ -50,4 +61,12 @@ typedef enum
 	
 }BuffStatus;
 
+typedef enum 
+{
+	CheckAddtionalLength = 0,
+	NotCheckAddtionalLength = 1,
+	
+}BuffConsType;
+
 extern LoopBuff uartbuff;
+extern unsigned char* Pop_Buff(LoopBuff *AimLoopBuff,unsigned char *Buffdst,unsigned short AimLength,BuffConsType IsCheckAddtionalLength);
