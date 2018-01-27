@@ -1,7 +1,7 @@
 #include "string.h"
 #include "stdlib.h"
 #include "stdio.h"
-
+#include "LoopRecBuff.h"
 LoopBuff uartbuff = 
 {
 		{NULL}, //ucBuff ucTempbuff
