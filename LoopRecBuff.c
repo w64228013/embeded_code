@@ -1,53 +1,58 @@
 #include "string.h"
 #include "stdlib.h"
 #include "stdio.h"
+/************************/
+#include "SYS_ENUM.h"
 #include "LoopRecBuff.h"
-LoopBuff uartbuff = 
-{
-		{NULL}, //ucBuff ucTempbuff
-		LimitedBuffTail,//usBuffLength
-		LimitedBuffHead,//usRecPos
-		LimitedBuffHead,//usReadPos
-		MaxReTryCount,//usRetryCount
-		0,//ucIsReadBusy
-};
+
+//LoopBuff uartbuff = 
+//{
+//		NULL, //ucBuff address
+//		MaxBuffLength,//usBuffLength
+//		LimitedBuffHead,//usRecPos
+//		LimitedBuffHead,//usReadPos
+//		MaxReTryCount,//usRetryCount
+//		0,//ucIsReadBusy
+//};
+
+unsigned char ucBuffArray[MaxBuffLength] = {0};
 
 /**
   * @brief  内部使用,当重试次数超过MaxReTryCount后调用
   * @note   
-  * @param  *AimLoopBuff:缓存块结构体的指针;RecPos:接收的缓存位置
+  * @param  *t_AimLoopBuffPtr:缓存块结构体的指针;RecPos:接收的缓存位置
   * @retval None
 */
-void Syn_Loop_Buff_Pos(LoopBuff *AimLoopBuff,unsigned short RecPos)
+void Syn_Loop_Buff_Pos(LoopBuff *t_AimLoopBuffPtr,unsigned short RecPos)
 {
-	AimLoopBuff->usReadPos = RecPos;
-	AimLoopBuff->usRetryCount = MaxReTryCount;
+	t_AimLoopBuffPtr->usReadPos = RecPos;
+	t_AimLoopBuffPtr->usRetryCount = MaxReTryCount;
 }
 /**
   * @brief  未使用,重置读取位置和接收位置
   * @note   
-  * @param  *AimLoopBuff:缓存块结构体的指针;
+  * @param  *t_AimLoopBuffPtr:缓存块结构体的指针;
   * @retval None
 */
-void Reset_Loop_Buff(LoopBuff *AimLoopBuff)
+void Reset_Loop_Buff(LoopBuff *t_AimLoopBuffPtr)
 {
 	/*前面需要增加响应的中断停止函数，防止Reset的瞬间触发中断*/
 	
-	AimLoopBuff->usReadPos = AimLoopBuff->usRecPos = 0;
+	t_AimLoopBuffPtr->usReadPos = t_AimLoopBuffPtr->usRecPos = 0;
 }
 /**
   * @brief  内部调用,确认缓存长度是否有效
   * @note   
-  * @param  *AimLoopBuff:缓存块结构体的指针;curLength:新增缓存的长度;AimLength:目标需要的长度;RecPos:接收的缓存位置,IsCheckAddtionalLength:是否需要检测超出的长度;
-  * @retval 1:长度正确;0:长度错误
+  * @param  *t_AimLoopBuffPtr:缓存块结构体的指针;curLength:新增缓存的长度;AimLength:目标需要的长度;RecPos:接收的缓存位置,IsCheckAddtionalLength:是否需要检测超出的长度;
+  * @retval RET_OK:长度正确;RET_ERR:长度错误
 */
-__inline BuffStatus Check_RetryCount_IsOver(LoopBuff *AimLoopBuff,unsigned short curLength,unsigned short AimLength,unsigned short RecPos,unsigned char IsRetainAddtionalLength)
+__inline return_value Check_RetryCount_IsOver(LoopBuff *t_AimLoopBuffPtr,unsigned short curLength,unsigned short AimLength,unsigned short RecPos,unsigned char IsRetainAddtionalLength)
 {
 	/*如果新增长度 >= 目标长度 说明正常返回true*/
 	if(curLength == AimLength)
 		{
-			AimLoopBuff->usRetryCount = MaxReTryCount;
-			return StatusOk;
+			t_AimLoopBuffPtr->usRetryCount = MaxReTryCount;
+			return RET_OK;
 		}
 	else if(curLength > AimLength)
 		{
@@ -55,57 +60,57 @@ __inline BuffStatus Check_RetryCount_IsOver(LoopBuff *AimLoopBuff,unsigned short
 		 if(IsRetainAddtionalLength != NotCheckAddtionalLength)
 			{
 				/*执行同步并且返回StatusErr*/
-				Syn_Loop_Buff_Pos(AimLoopBuff,RecPos);
-				return StatusErr;
+				Syn_Loop_Buff_Pos(t_AimLoopBuffPtr,RecPos);
+				return RET_ERR;
 			}
-			AimLoopBuff->usRetryCount = MaxReTryCount;
-			return StatusOk;
+			t_AimLoopBuffPtr->usRetryCount = MaxReTryCount;
+			return RET_OK;
 		}	
 	else
 	{
 		/*如果重试次数到了则执行同步*/
-		if( --AimLoopBuff->usRetryCount == 0 )
+		if( --t_AimLoopBuffPtr->usRetryCount == 0 )
 		{
-//			printf("%d\r\n",AimLoopBuff->usRetryCount);
-			Syn_Loop_Buff_Pos(AimLoopBuff,RecPos);
+//			printf("%d\r\n",t_AimLoopBuffPtr->usRetryCount);
+			Syn_Loop_Buff_Pos(t_AimLoopBuffPtr,RecPos);
 		}
-//		else {printf("%d\r\n",AimLoopBuff->usRetryCount);}
-		return StatusErr;
+//		else {printf("%d\r\n",t_AimLoopBuffPtr->usRetryCount);}
+		return RET_ERR;
 	}
 }
 /**
   * @brief  外部调用,读取响应长度的
   * @note   
-  * @param  *AimLoopBuff:缓存块结构体的指针;*Buffdst:弹出数据的拷贝地址;AimLength:目标需要的长度,IsCheckAddtionalLength:是否需要检测超出的长度;
+  * @param  *t_AimLoopBuffPtr:缓存块结构体的指针;*Buffdst:弹出数据的拷贝地址;AimLength:目标需要的长度,IsCheckAddtionalLength:是否需要检测超出的长度;
   * @retval *Buffdst:正确的话返回拷贝地址;NULL:错误的话返回空指针地址
 */	
-unsigned char* Takeout_Buff(LoopBuff *AimLoopBuff,unsigned char *Buffdst,unsigned short AimLength,BuffConsType IsCheckAddtionalLength)
+unsigned char* Takeout_Buff(LoopBuff *t_AimLoopBuffPtr,unsigned char *Buffdst,unsigned short AimLength,BuffConsType IsCheckAddtionalLength)
 {
-	const unsigned short constRecPos = AimLoopBuff->usRecPos;
-	int offset = constRecPos - AimLoopBuff->usReadPos; 
+	const unsigned short constRecPos = t_AimLoopBuffPtr->usRecPos;
+	int offset = constRecPos - t_AimLoopBuffPtr->usReadPos; 
 	unsigned short tempoffset = {0}; 
-	
-	if(offset == 0)//没有新数据返回空指针
+	/*没有新数据,或者AimLength为0*/
+	if((offset == 0)||(AimLength==0))
 		return NULL;
 	/*offset>0,Pos正序,新增长度是 = offset*/
 	else if(offset > 0)
 	{	
-		if(Check_RetryCount_IsOver(AimLoopBuff,offset,AimLength,constRecPos,IsCheckAddtionalLength) != StatusOk)
+		if(Check_RetryCount_IsOver(t_AimLoopBuffPtr,offset,AimLength,constRecPos,IsCheckAddtionalLength) != RET_OK)
 			return NULL;
 		/*Pos正序方式读取*/
 		/*保存初始ReadPos*/		
-		tempoffset = AimLoopBuff->usReadPos;
+		tempoffset = t_AimLoopBuffPtr->usReadPos;
 		
 		#if BuffMode == PreciseMode
-			AimLoopBuff->usReadPos += AimLength;
+			t_AimLoopBuffPtr->usReadPos += AimLength;
 		#elif	BuffMode == RoughMode
-			AimLoopBuff->usReadPos = constRecPos;
+			t_AimLoopBuffPtr->usReadPos = constRecPos;
 		#endif /*BuffMode == RoughMode*/
 		
 		/*数据搬到dst地址所指的区域,并返回dst地址*/
-		return memcpy(Buffdst,&AimLoopBuff->ucBuff[tempoffset],AimLength);
+		return memcpy(Buffdst,&t_AimLoopBuffPtr->ucBuff[tempoffset],AimLength);
 	}
-	/*offset<0,Pos倒序,新增长度 = offset+MaxBuffLength */
+	/*offset<0,Pos倒序,新增长度 = offset+t_AimLoopBuffPtr->usBuffLength */
 	else if(offset < 0)
 	{		
 		/*如果目标长度 > 新增长度,返回NULL,不对Buff做读取*/
@@ -116,72 +121,88 @@ unsigned char* Takeout_Buff(LoopBuff *AimLoopBuff,unsigned char *Buffdst,unsigne
 		*/
 		/*先计算出当前 这里:offset 是负数 + 整个buff长度 = 实际新增buff长度*/
 		/*返回 NULL 说明数据有问题 return NULL*/
-		if (Check_RetryCount_IsOver(AimLoopBuff,offset+MaxBuffLength,AimLength,constRecPos,IsCheckAddtionalLength) != StatusOk)
+		if (Check_RetryCount_IsOver(t_AimLoopBuffPtr,offset+t_AimLoopBuffPtr->usBuffLength,AimLength,constRecPos,IsCheckAddtionalLength) != RET_OK)
 			return NULL;
 		/*Pos倒序,先读取尾部剩余长度tempoffset*/
-		tempoffset = MaxBuffLength - AimLoopBuff->usReadPos;
+		tempoffset = t_AimLoopBuffPtr->usBuffLength - t_AimLoopBuffPtr->usReadPos;
 		/*如果目标长度 <= 尾部剩余长度,则按照Pos正序方式读取*/
 		if(AimLength <= tempoffset)
 		{
-			tempoffset = AimLoopBuff->usReadPos;
+			tempoffset = t_AimLoopBuffPtr->usReadPos;
 			
 			#if BuffMode == PreciseMode
-				AimLoopBuff->usReadPos += AimLength;
+				t_AimLoopBuffPtr->usReadPos += AimLength;
 			#elif	BuffMode == RoughMode
-				AimLoopBuff->usReadPos = constRecPos;
+				t_AimLoopBuffPtr->usReadPos = constRecPos;
 			#endif /*BuffMode == RoughMode*/		
 			
-			return memcpy(Buffdst,&AimLoopBuff->ucBuff[tempoffset],AimLength);
+			return memcpy(Buffdst,&t_AimLoopBuffPtr->ucBuff[tempoffset],AimLength);
 		}
 		/*Pos倒序方式读取*/
 		/*1:读取尾部剩余*/
-		memcpy(Buffdst,&AimLoopBuff->ucBuff[AimLoopBuff->usReadPos],tempoffset);		
+		memcpy(Buffdst,&t_AimLoopBuffPtr->ucBuff[t_AimLoopBuffPtr->usReadPos],tempoffset);		
 		/*2::读取头部 目标长度 - 尾部长度 */
-		memcpy(Buffdst + tempoffset,&AimLoopBuff->ucBuff[0],AimLength - tempoffset);
+		memcpy(Buffdst + tempoffset,&t_AimLoopBuffPtr->ucBuff[0],AimLength - tempoffset);
 		
 		#if BuffMode == PreciseMode
-			AimLoopBuff->usReadPos = AimLength - tempoffset;
+			t_AimLoopBuffPtr->usReadPos = AimLength - tempoffset;
 		#elif	BuffMode == RoughMode
-			AimLoopBuff->usReadPos = constRecPos;
+			t_AimLoopBuffPtr->usReadPos = constRecPos;
 		#endif /*BuffMode == RoughMode*/
 		
 		/*数据搬到dst地址所指的区域,并返回dst地址*/
 		return Buffdst;		
 	}
+	return NULL;
 }
 /**
   * @brief  外部调用,接收数据
   * @note   
-  * @param  *AimLoopBuff:缓存块结构体的指针;data:接收到的每一个字节
+  * @param  *t_AimLoopBuffPtr:缓存块结构体的指针;data:接收到的每一个字节
   * @retval 
 */
-void Putin_Buff(LoopBuff *AimLoopBuff,unsigned char data)
+void Putin_Buff(LoopBuff *t_AimLoopBuffPtr,unsigned char data)
 {	
-	AimLoopBuff->ucBuff[AimLoopBuff->usRecPos++] = data;
-	if( AimLoopBuff->usRecPos > LimitedBuffTail )
+	t_AimLoopBuffPtr->ucBuff[t_AimLoopBuffPtr->usRecPos++] = data;
+	if( t_AimLoopBuffPtr->usRecPos >= t_AimLoopBuffPtr->usBuffLength )
 	{
-		AimLoopBuff->usRecPos = LimitedBuffHead;
+		t_AimLoopBuffPtr->usRecPos = LimitedBuffHead;
 	}
 }
-
-
+/**
+  * @brief  外部调用,初始化接收块
+  * @note   
+  * @param  *t_AimLoopBuffPtr:缓存块结构体的指针;*ucBuffArrayPtr:块的内存地址;usBuffLength:块的长度
+  * @retval RET_OK:成功;RET_ERR:失败
+*/
+return_value Initializaion_Loop_Buff(LoopBuff *t_AimLoopBuffPtr,unsigned char *ucBuffArrayPtr,unsigned short usBuffLength)
+{
+	if((usBuffLength > MaxBuffLength)||(ucBuffArrayPtr == NULL))
+		return RET_ERR;
+	t_AimLoopBuffPtr->ucBuff = ucBuffArrayPtr;/*地址赋值*/
+	t_AimLoopBuffPtr->usBuffLength = usBuffLength;/*长度赋值*/	
+	t_AimLoopBuffPtr->usRecPos = LimitedBuffHead;
+	t_AimLoopBuffPtr->usReadPos = LimitedBuffHead;
+	t_AimLoopBuffPtr->usRetryCount = MaxReTryCount;
+	t_AimLoopBuffPtr->ucIsReadBusy = 0;
+	return RET_OK;	
+}
 
 /*receive example*/
-void USART1_IRQHandler(void)                	
-{
-	if(USART_GetITStatus(USART1,USART_IT_RXNE)== SET)
-	{
-		USART_ClearITPendingBit(USART1,USART_IT_RXNE);
-		Putin_Buff(&uartbuff,USART_ReceiveData(USART1));
-	}
-
-}
+//void USART1_IRQHandler(void)                	
+//{
+//	if(USART_GetITStatus(USART1,USART_IT_RXNE)== SET)
+//	{
+//		USART_ClearITPendingBit(USART1,USART_IT_RXNE);
+//		Putin_Buff(&uartbuff,USART_ReceiveData(USART1));
+//	}
+//}
 
 /*read example*/
-void Read_Buff(void)
-{ 
-	unsigned char tempbuff[10];	
-	printf("the data is %02x",Takeout_Buff(&uartbuff,tempbuff,4));
-}
+//void Read_Buff(void)
+//{ 
+//	unsigned char tempbuff[10];	
+//	printf("the data is %02x",Takeout_Buff(&uartbuff,tempbuff,4));
+//}
 
 
