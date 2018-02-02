@@ -170,6 +170,17 @@ void Putin_Buff(LoopBuff *t_AimLoopBuffPtr,unsigned char data)
 	}
 }
 /**
+  * @brief  外部调用,接收数据根据长度
+  * @note   
+  * @param  *t_AimLoopBuffPtr:缓存块结构体的指针;*ucBuffPtr:接受数据的指针;usBuffLength:数据长度;
+  * @retval 
+*/
+void Putin_Buff_By_Length(LoopBuff *t_AimLoopBuffPtr,unsigned char *ucBuffPtr,unsigned short usBuffLength)
+{
+	while(usBuffLength--)
+		Putin_Buff(t_AimLoopBuffPtr,*(ucBuffPtr++));
+}
+/**
   * @brief  外部调用,初始化接收块
   * @note   
   * @param  *t_AimLoopBuffPtr:缓存块结构体的指针;*ucBuffArrayPtr:块的内存地址;usBuffLength:块的长度
